@@ -1,14 +1,16 @@
+'''
+Module to run snaplock policy creator
+'''
+import warnings
 from validation_service import ValidationService
 from policy_service import PolicyService
-from time import sleep
-import warnings
-import simple_term_menu
 warnings.filterwarnings("ignore")
 
-def main():
+
+def main() -> None:
+    '''Entry point to application'''
     validation_service = ValidationService()
     validation_service.run_validation()
-    
     policy_service = PolicyService()
     policy_service.update_svms()
 

@@ -1,8 +1,12 @@
-import requests
+'''
+the validation service ensures the cluster can 
+create a valid and usable snaplock policy
+'''
 import json
 import warnings
+import requests
 from colorama import Fore
-warnings.filterwarnings('ignore') 
+warnings.filterwarnings('ignore')
 
 
 class ValidationService():
@@ -28,21 +32,27 @@ class ValidationService():
 
 
     def has_compliant_snaplock(self):
-        # Returns whether the given cluster 
+        '''
+        checks whether there is a compliant snaplock license installed
+        on the cluster
+        '''
         url = f"{self.url}/cluster/licensing/licenses?fields=name,state&return_records=true&return_timeout=15"
 
-        response = requests.request("GET", url, headers=self.headers, verify=False)
+        response = requests.request("GET", url, headers=self.headers, verify=False, timeout=50)
 
         licenses = json.loads(response.text)["records"]
-        for license in licenses:
-            if license['name'] == 'snaplock' and license['state'] == "compliant":
+        for license_obj in licenses:
+            if license_obj['name'] == 'snaplock' and license_obj['state'] == "compliant":
                 return True
         return False
 
     def has_compliance_clock(self):
+        '''
+        checks whether there is a compliance clock initialized
+        '''
         url = f"{self.url}/storage/snaplock/compliance-clocks?fields=*"
 
-        response = requests.request("GET", url, headers=self.headers, verify=False)
+        response = requests.request("GET", url, headers=self.headers, verify=False, timeout=50)
 
         compliance_clocks = json.loads(response)["records"]
         if compliance_clocks:
@@ -50,31 +60,43 @@ class ValidationService():
         return False
 
     def get_version(self):
+        '''
+        retrieves the cluster ONTAP version
+        '''
         url = f"{self.url}/cluster"
 
-        response = requests.request("GET", url, headers=self.headers, verify=False)
+        response = requests.request("GET", url, headers=self.headers, verify=False, timeout=50)
 
         version = json.loads(response.text)['version']
         return version
 
     def get_cgs(self):
+        '''
+        retrieves consistency groups in cluster
+        '''
         url = f"{self.url}/application/consistency-groups"
-        response = requests.request("GET", url, headers=self.headers, verify=False)
+        response = requests.request("GET", url, headers=self.headers, verify=False, timeout=50)
 
         cgs = json.loads(response.text)["records"]
         return cgs
 
 
     def get_cg_volumes(self, uuid):
+        '''
+        maps all cgs to their member volumes
+        '''
         url = f"{self.url}/application/consistency-groups/{uuid}?fields=volumes"
-        response = requests.request("GET", url, headers=self.headers, verify=False)
+        response = requests.request("GET", url, headers=self.headers, verify=False, timeout=50)
 
         return [x["name"] for x in json.loads(response.text)["volumes"]]
 
     def get_rw_volumes(self):
+        '''
+        retrieves all volumes of type rw
+        '''
         url = f"{self.url}/storage/volumes?type=rw&fields=name,type"
 
-        response = requests.request("GET", url, headers=self.headers, verify=False)
+        response = requests.request("GET", url, headers=self.headers, verify=False, timeout=50)
 
         volume_names = []
         volumes = json.loads(response.text)["records"]
@@ -84,19 +106,26 @@ class ValidationService():
         return sorted(volume_names)
 
     def get_volumes_in_relationships(self):
+        '''
+        retrieves all volumes in relationships
+        '''
         url = f"{self.url}/snapmirror/relationships"
 
-        response = requests.request("GET", url, headers=self.headers, verify=False)
+        response = requests.request("GET", url, headers=self.headers, verify=False, timeout=50)
         volumes = set()
         for record in json.loads(response.text)["records"]:
             source = record["source"]["path"].split('/')[-1]
             destination = record["destination"]["path"].split('/')[-1]
             volumes.add(source)
-            volumes.add(destination)
-            
+            volumes.add(destination)         
         return json.loads(response.text)["records"]
 
     def run_validation(self):
+        '''
+        runs a series of checks on the cluster to ensure it has a compliant
+        version of ONTAP, valid snaplock license installed, initialized
+        compliance clock, and elligible rw volumes not in relationships
+        '''
         # Verify ONTAP version
         print("Checking if valid ONTAP version is available...")
         version = self.get_version()
@@ -112,7 +141,7 @@ class ValidationService():
         if license_installed:
             print("\t\U00002705 Valid snaplock license found.")
         else:
-            print("\t\U0000274C No valid license found. This may be due to a snaplock license not being installed or an existing one not being compliant. \n\t  Please follow these instructions to install a snaplock license <link to installation instructions>.")
+            print(f"\t\U0000274C No valid license found. This may be due to a snaplock license not being installed or an existing one not being compliant. \n\t  Please follow these instructions to install a snaplock license <link to installation instructions>.")
             exit()
 
         # Check whether compliance clock is initialized
@@ -123,7 +152,6 @@ class ValidationService():
         else:
             print("\t\U0000274C No initialized compliance clock found. Initialize a compliance clock to proceed.")
             exit()
-        
         # TODO # Check whether FabricPool policy is set to none
         # print("Checking if FabricPool policy is set to none...")
 
@@ -156,8 +184,3 @@ class ValidationService():
 
 if __name__ == '__main__':
     validation_service = ValidationService()
-
-
-
-
-
