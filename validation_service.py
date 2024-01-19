@@ -3,9 +3,14 @@ the validation service ensures the cluster can
 create a valid and usable snaplock policy
 '''
 import json
+from re import L
 import warnings
 import requests
-from colorama import Fore
+import cli_box
+from colorama import init, Fore
+from time import sleep
+from simple_term_menu import TerminalMenu
+init(autoreset=True)
 warnings.filterwarnings('ignore')
 
 
@@ -119,6 +124,33 @@ class ValidationService():
             volumes.add(source)
             volumes.add(destination)         
         return json.loads(response.text)["records"]
+    
+    def install_license(self):
+        '''Installs the snaplock license'''
+        menu = TerminalMenu(menu_entries=["Yes", "No"], title="Would you like to install a snaplock license?")
+        selection_i = menu.show()
+        if selection_i == 1:
+            return False
+        valid_key = False
+        while not valid_key:
+            print(cli_box.rounded("License Key: " + "_"*28))
+            license_key = input("\033[2A\033[15C")
+            if license_key == "":
+                break
+            elif len(license_key) > 28 or len(license_key) < 28:
+                print(Fore.RED + "\033[1BKey must be 28 characters!\033[4A")
+                continue
+            else:
+                url = f"{self.url}/cluster/licensing/licenses"
+                response = requests.post(url=url, headers=self.headers, verify=False, json={"keys": [license_key]})
+                if "error" in json.loads(response.text):
+                    print(Fore.RED + "\033[1BInvalid key!                        \033[4A")
+                else:
+                    valid_key = True
+        if not valid_key:
+            return False
+        print(Fore.GREEN + "\033[1BLicense successfully added.        ")
+        return True
 
     def run_validation(self):
         '''
@@ -141,8 +173,12 @@ class ValidationService():
         if license_installed:
             print("\t\U00002705 Valid snaplock license found.")
         else:
-            print(f"\t\U0000274C No valid license found. This may be due to a snaplock license not being installed or an existing one not being compliant. \n\t  Please follow these instructions to install a snaplock license <link to installation instructions>.")
-            exit()
+            print(f"\t\U0000274C No valid license found. This may be due to a snaplock license not being installed or an existing one not being compliant.")
+            license_installed = self.install_license()
+            if not license_installed:
+                print(Fore.RED + "\033[1BYou must obtain a valid license key to continue.")
+                sleep(1)
+                exit()
 
         # Check whether compliance clock is initialized
         print("Checking if a compliance clock has been initialized...")
@@ -160,7 +196,7 @@ class ValidationService():
         if volumes:
             print(f"\t\U00002705 {len(volumes)} read/write volumes found.")
         else:
-            print("\t\U0000274C No read\write volumes found.")
+            print("\t\U0000274C No read/write volumes found.")
             exit()
 
         print("Checking for volumes not in a snapmirror relationship...")
@@ -179,7 +215,7 @@ class ValidationService():
         eligible_volumes = sorted(list(eligible_volumes))
         self.eligible_volumes = eligible_volumes
 
-        print(Fore.GREEN + "\n\U00002705 ---------- Validation check complete ----------- \U00002705\n")
+        print("\n\U00002705 ---------- Validation check complete ----------- \U00002705\n")
 
 
 if __name__ == '__main__':

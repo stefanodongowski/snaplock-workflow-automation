@@ -15,7 +15,10 @@ def main() -> None:
     policy_service.update_svms()
 
     # Allow user to customize their policy
-    policy_service.show_policy_menu()
+    status = None
+    while status != "early exit":
+        res = policy_service.show_policy_menu()
+        status = res["status"]
 
 
 if __name__ == '__main__':
