@@ -60,6 +60,7 @@ class PolicyService():
             print ("\033[A                                                                                         \033[A")
 
     def show_policy_info(self):
+        self.clear_lines(7)
         svm = "SVM: " + Fore.RED + self.selected_svm + Fore.BLACK + "\n"
         policy = "Policy name: " + Fore.RED + self.policy_name + Fore.BLACK + "\n"
         schedule = "Schedule: " + Fore.RED + self.schedule + Fore.BLACK + "\n"
@@ -106,6 +107,8 @@ class PolicyService():
             "name": "tutorial_",
             "enabled": False
         }
+        for _ in range(7):
+                print()
         while policy_creation_in_progress:
             self.show_policy_info()
 
@@ -133,8 +136,8 @@ class PolicyService():
                 case "Policy name":
                     policy["name"] = input("Policy name: ")
                     self.policy_name = Fore.GREEN + policy["name"] + Fore.BLACK
-                    self.clear_lines(1)
                     name_chosen = True
+                    self.clear_lines(1)
                 case "Schedule":
                     schedules = self.get_schedules()
                     options = [x["name"] for x in schedules]
@@ -149,16 +152,15 @@ class PolicyService():
                 case "Count":
                     policy["copies"][0]["count"] = str(input("Keep count: "))
                     self.keep_count = Fore.GREEN + policy["copies"][0]["count"] + Fore.BLACK
-                    self.clear_lines(1)
                     count_chosen = True
+                    self.clear_lines(1)
                 case "Retention Period":
-                    policy["copies"][0]["retention_period"] = input("Select a retention period. \n\tW = weeks \n\tD = days \n\tH = hours \n\tM = minutes \n\tS = seconds\n(e.g. 20H = 20 hours):\n")
-                    self.clear_lines(8)
-                    self.retention_period = Fore.GREEN + "PT" + policy["copies"][0]["retention_period"]
+                    policy["copies"][0]["retention_period"] = "PT" + input("Select a retention period. \n\tW = weeks \n\tD = days \n\tH = hours \n\tM = minutes \n\tS = seconds\n(e.g. 20H = 20 hours):\n")
+                    self.retention_period = Fore.GREEN + policy["copies"][0]["retention_period"]
                     retention_chosen = True
+                    self.clear_lines(8)
                 case "Exit":
                     exited = True
-                    self.clear_lines(8)
                     return {
                             "status" : "early exit",
                             "policy" : None
@@ -175,8 +177,8 @@ class PolicyService():
                         self.schedule = Fore.RED + "None" + Fore.BLACK
                         self.keep_count = Fore.RED + "None" + Fore.BLACK
                         self.retention_period = Fore.RED + 'None' + Fore.BLACK 
-                        self.clear_lines(8)
                         confirmed = True
+                        
                         break
 
             policy_creation_in_progress = ((not svm_chosen or 
@@ -192,17 +194,18 @@ class PolicyService():
                             count_chosen and 
                             retention_chosen)
             
-            print("\033[8A")
             
+        
+        json.dumps(policy)
+        url = self.url + "/storage/snapshot-policies"
+        response = requests.request("POST", url, headers=self.headers, data=json.dumps(policy), verify=False)
+
+        if str(response.status_code) == "201":
+            print(f"Successfully created policy '{policy['name']}.' This policy is currently inactive, enable through System Manager.")
+        else:
+            print(f"Could not create policy {policy['name']}. Reason: {response.reason}.")
+        
         return {
                 "status" : "success",
                 "policy" : policy 
                }
-        # json.dumps(policy)
-        # url = self.url + "/storage/snapshot-policies"
-        # response = requests.request("POST", url, headers=self.headers, data=json.dumps(policy), verify=False)
-
-        # if str(response.status_code) == "201":
-        #     print(f"Successfully created policy {policy['name']}.")
-        # else:
-        #     print("Policy already exists. Choose a different name.")

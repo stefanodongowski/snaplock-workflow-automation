@@ -3,6 +3,7 @@ the validation service ensures the cluster can
 create a valid and usable snaplock policy
 '''
 import json
+import sys
 from re import L
 import warnings
 import requests
@@ -59,7 +60,7 @@ class ValidationService():
 
         response = requests.request("GET", url, headers=self.headers, verify=False, timeout=50)
 
-        compliance_clocks = json.loads(response)["records"]
+        compliance_clocks = json.loads(response.text)["records"]
         if compliance_clocks:
             return True
         return False
@@ -178,16 +179,26 @@ class ValidationService():
             if not license_installed:
                 print(Fore.RED + "\033[1BYou must obtain a valid license key to continue.")
                 sleep(1)
-                exit()
+                sys.exit()
 
         # Check whether compliance clock is initialized
         print("Checking if a compliance clock has been initialized...")
-        clock_initialized = self.has_compliant_snaplock()
+        clock_initialized = self.has_compliance_clock()
         if clock_initialized:
             print("\t\U00002705 Initialized compliance clock found.")
         else:
             print("\t\U0000274C No initialized compliance clock found. Initialize a compliance clock to proceed.")
-            exit()
+            url = f"{self.url}/cluster/nodes"
+            response = requests.request("GET", url, headers=self.headers, verify=False, timeout=50)
+            options = [x["name"] for x in json.loads(response.text)["records"]]
+            menu = TerminalMenu(options, multi_select=True, title="Press SPACE select the node(s) to initialize compliance clock:", menu_cursor_style=("fg_blue", "bold"), multi_select_cursor_style=("fg_blue", "bold"))
+            selections = menu.show()
+            for node in selections:
+                node_to_initialize = {"node": {"name": node}}
+                url = f"{self.url}/storage/snaplock/compliance-clocks"
+                response = requests.request("POST", url=url, headers=self.headers, data=json.dumps(node_to_initialize), verify=False)
+            print("Compliance clock initialized successfully!")
+            
         # TODO # Check whether FabricPool policy is set to none
         # print("Checking if FabricPool policy is set to none...")
 
